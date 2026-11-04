@@ -1,7 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from app.routers import users
-from app.routers import auth
+from app.routers import users, auth, projects
 from app.db.database import Base, engine
 from sqlalchemy import text
 
@@ -14,6 +13,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.include_router(users.router)
 app.include_router(auth.router)
+app.include_router(projects.router)
 
 @app.get("/")
 def root():
