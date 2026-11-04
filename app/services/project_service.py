@@ -4,7 +4,10 @@ from app.models.user import User
 from app.models.project import Project
 from app.models.project_member import ProjectMember
 from app.schemas.project import ProjectCreate, ProjectUpdate
-from fastapi import HTTPException
+from app.models.document import Document
+from fastapi import HTTPException, UploadFile
+import uuid
+import os
 
 
 def _projects_with_member_user_ids(db: Session, projects: list[Project]):
@@ -18,6 +21,23 @@ def _projects_with_member_user_ids(db: Session, projects: list[Project]):
     for project_id, user_id in member_rows:
         member_user_ids[project_id].append(user_id)
 
+    document_rows = (
+        db.query(Document.project_id, Document.id, Document.filename)
+        .filter(Document.project_id.in_(project_ids))
+        .all()
+    )
+    project_documents = {
+        project_id: []
+        for project_id in project_ids
+    }
+    for project_id, document_id, filename, in document_rows:
+        project_documents[project_id].append(
+            {
+                "id": document_id,
+                "filename": filename
+            }
+        )
+
     return [
         {
             "id": project.id,
@@ -25,7 +45,7 @@ def _projects_with_member_user_ids(db: Session, projects: list[Project]):
             "description": project.description,
             "owner_id": project.owner_id,
             "member_user_ids": member_user_ids[project.id],
-            "documents": [],
+            "documents": project_documents[project_id],
         }
         for project in projects
     ]
@@ -221,3 +241,98 @@ def delete_project(
 
     return {"message": "Project deleted successfully"}
 
+
+def get_project_documents(
+    db: Session, 
+    project_id: int, 
+    user_id: int
+):
+    project = (
+            db.query(Project)
+            .filter(Project.id == project_id)
+            .first()
+        )
+    
+    if not project:
+        raise HTTPException(
+            status_code=404, 
+            detail="Project not found"
+        )
+    
+    membership = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user_id
+        )
+        .first()
+    )
+
+    if not membership and project.owner_id != user_id:
+        raise HTTPException(
+            status_code=403, 
+            detail="Only project members can list project documents"
+        )
+
+    documents = (
+        db.query(Document)
+        .filter(Document.project_id == project_id)
+        .all()
+    )
+
+    return documents
+
+
+def upload_project_document(
+    db: Session,
+    project_id: int,
+    file: UploadFile,
+    user_id: int
+):
+    os.makedirs("uploads", exist_ok=True)
+    
+    project = (
+        db.query(Project)
+        .filter(Project.id == project_id)
+        .first()
+    )
+    
+    if not project:
+        raise HTTPException(
+            status_code=404, 
+            detail="Project not found"
+        )
+    
+    membership = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user_id
+        )
+        .first()
+    )
+
+    if not membership and project.owner_id != user_id:
+        raise HTTPException(
+            status_code=403, 
+            detail="Only project members can upload documents"
+        )
+
+    unique_name = (f"{uuid.uuid4()}_{file.filename}")
+    file_path = os.path.join("uploads", unique_name)
+
+    with open(file_path, "wb") as buffer:
+        buffer.write(file.file.read())
+
+    document = Document(
+        filename=file.filename,
+        stored_filename=unique_name,
+        file_path=file_path,
+        project_id=project_id,
+        uploaded_by=user_id
+    )
+
+    db.add(document)
+    db.commit()
+    db.refresh(document)
+    return document
