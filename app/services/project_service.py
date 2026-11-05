@@ -231,7 +231,7 @@ def delete_project(
     if project.owner_id != user_id:
         raise HTTPException(
             status_code=403, 
-            detail="Only project owner can update project infos"
+            detail="Only project owner can delete project"
         )
 
     db.query(ProjectMember).filter(
@@ -383,6 +383,7 @@ def download_document(
         media_type="application/octet-stream"
     )
 
+
 def update_document(
     db: Session, 
     document_id: int, 
@@ -434,4 +435,42 @@ def update_document(
     db.refresh(document)
 
     return document
+
+
+def delete_document(
+    db: Session, 
+    document_id: int, 
+    user_id: int
+):
+    document = (
+        db.query(Document)
+        .filter(Document.id == document_id)
+        .first()
+    )
+
+    if not document:
+        raise HTTPException(
+            status_code=404, 
+            detail="Document not found"
+        )
+
+    membership = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == document.project_id,
+            ProjectMember.user_id == user_id
+        )
+        .first()
+    )
+
+    if not membership:
+        raise HTTPException(
+            status_code=403, 
+            detail="Only project members can delete documents"
+        )
+
+    db.delete(document)
+    db.commit()
+
+    return {"message": "Document deleted successfully"}
 

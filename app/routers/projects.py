@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.dependencies import get_db
 from app.schemas.project import ProjectCreate, ProjectResponse, ProjectUpdate
 from app.schemas.document import DocumentResponse
-from app.services.project_service import (create_project, get_projects, invite_user, get_project_info, update_project_info, delete_project, get_project_documents, upload_project_document, download_document, update_document)
+from app.services.project_service import (create_project, get_projects, invite_user, get_project_info, update_project_info, delete_project, get_project_documents, upload_project_document, download_document, update_document, delete_document)
 from app.models.user import User
 from app.core.dependencies import get_current_user
 from typing import List
@@ -59,3 +59,8 @@ def get_document(document_id: int, current_user: User=Depends(get_current_user),
 @router.put("/documents/{document_id}", response_model=DocumentResponse)
 def update_document_endpoint(document_id: int, file: UploadFile = File(...), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)):
     return update_document(db, document_id, file, current_user.id)
+
+
+@router.delete("/documents/{document_id}")
+def delete_document_endpoint(document_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)):
+    return delete_document(db, document_id, current_user.id)
