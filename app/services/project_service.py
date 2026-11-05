@@ -382,3 +382,56 @@ def download_document(
         filename=document.filename, 
         media_type="application/octet-stream"
     )
+
+def update_document(
+    db: Session, 
+    document_id: int, 
+    file: UploadFile,
+    user_id: int
+):
+    document = (
+        db.query(Project)
+        .filter(Project.id == document_id)
+        .first()
+    )
+
+    if not document:
+        raise HTTPException(
+            status_code=404, 
+            detail="Document not found"
+        )
+
+    membership = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == document.project_id,
+            ProjectMember.user_id == user_id
+        )
+        .first()
+    )
+
+    if not membership:
+        raise HTTPException(
+            status_code=403, 
+            detail="Only project members can update documents"
+        )
+
+    if os.path.exists(document.file_path):
+        os.remove(document.file_path)
+
+    unique_name = (f"{uuid.uuid4()}_{file.filename}")
+
+    file_path = os.path.join("uploads", unique_name)
+
+    with open(file_path, "wb") as buffer:
+        buffer.write(file.file.read())
+
+    document.filename = file.filename
+    document.stored_filename = unique_name
+    document.file_path = file_path
+
+    db.commit()
+    db.refresh(document)
+
+    return document
+
