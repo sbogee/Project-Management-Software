@@ -6,6 +6,7 @@ from app.models.project_member import ProjectMember
 from app.schemas.project import ProjectCreate, ProjectUpdate
 from app.models.document import Document
 from fastapi import HTTPException, UploadFile
+from fastapi.responses import FileResponse
 import uuid
 import os
 
@@ -336,3 +337,48 @@ def upload_project_document(
     db.commit()
     db.refresh(document)
     return document
+
+
+def download_document(
+    db: Session,
+    document_id: int,
+    user_id: int
+):
+    document = (
+        db.query(Document)
+        .filter(Document.id == document_id)
+        .first()
+    )
+
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+
+    membership = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == document.project_id,
+            ProjectMember.user_id == user_id
+        )
+        .first()
+    )
+
+    if not membership:
+        raise HTTPException(
+            status_code=403, 
+            detail="Only project members can download documents"
+        )
+
+    if not os.path.exists(document.file_path):
+        raise HTTPException(
+            status_code=404,
+            detail="File not found on disk"
+        )
+
+    return FileResponse(
+        path=document.file_path, 
+        filename=document.filename, 
+        media_type="application/octet-stream"
+    )
