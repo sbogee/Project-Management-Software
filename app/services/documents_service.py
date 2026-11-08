@@ -1,3 +1,5 @@
+"""Service operations for project documents."""
+
 import os
 import uuid
 
@@ -14,6 +16,10 @@ def download_document(
     document_id: int,
     user_id: int,
 ):
+    """Return a document file if the user belongs to its project.
+    Raises:
+        HTTPException: If the document or file is missing, or access is denied.
+    """
     document = (
         db.query(Document)
         .filter(Document.id == document_id)
@@ -60,6 +66,10 @@ def update_document(
     file: UploadFile,
     user_id: int,
 ):
+    """Replace a document's stored file and update its database record.
+    Raises:
+        HTTPException: If the document is missing or access is denied.
+    """
     document = (
         db.query(Document)
         .filter(Document.id == document_id)
@@ -112,6 +122,10 @@ def delete_document(
     document_id: int,
     user_id: int,
 ):
+    """Delete a document record if the user belongs to its project.
+    Raises:
+        HTTPException: If the document is missing or access is denied.
+    """
     document = (
         db.query(Document)
         .filter(Document.id == document_id)

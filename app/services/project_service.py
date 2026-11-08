@@ -1,17 +1,22 @@
-from sqlalchemy.orm import Session
+"""Business logic for projects and their documents."""
+
+import os
+import uuid
+
+from fastapi import HTTPException, UploadFile
 from sqlalchemy import case
-from app.models.user import User
+from sqlalchemy.orm import Session
+
+from app.enums.project_role import ProjectRole
+from app.models.document import Document
 from app.models.project import Project
 from app.models.project_member import ProjectMember
+from app.models.user import User
 from app.schemas.project import ProjectCreate, ProjectUpdate
-from app.models.document import Document
-from fastapi import HTTPException, UploadFile
-from app.enums.project_role import ProjectRole
-import uuid
-import os
 
 
 def _projects_with_member_user_ids(db: Session, project_ids: list[int]):
+    """Build project response data with member and document identifiers."""
     projects = (
         db.query(Project)
         .filter(Project.id.in_(project_ids))
@@ -37,11 +42,11 @@ def _projects_with_member_user_ids(db: Session, project_ids: list[int]):
         project_id: []
         for project_id in project_ids
     }
-    for project_id, document_id, filename, in document_rows:
+    for project_id, document_id, filename in document_rows:
         project_documents[project_id].append(
             {
                 "id": document_id,
-                "filename": filename
+                "filename": filename,
             }
         )
 
@@ -58,13 +63,26 @@ def _projects_with_member_user_ids(db: Session, project_ids: list[int]):
     ]
 
 
-def create_project(db: Session, project_data: ProjectCreate, owner_id: int):
-    project = Project(name=project_data.name, description=project_data.description, owner_id=owner_id)
+def create_project(
+    db: Session,
+    project_data: ProjectCreate,
+    owner_id: int,
+):
+    """Create a project and add its owner as an owner-role member."""
+    project = Project(
+        name=project_data.name,
+        description=project_data.description,
+        owner_id=owner_id,
+    )
     db.add(project)
     db.commit()
     db.refresh(project)
 
-    owner_member = ProjectMember(project_id=project.id, user_id=owner_id, role=ProjectRole.OWNER)
+    owner_member = ProjectMember(
+        project_id=project.id,
+        user_id=owner_id,
+        role=ProjectRole.OWNER,
+    )
     db.add(owner_member)
     db.commit()
 
@@ -72,6 +90,7 @@ def create_project(db: Session, project_data: ProjectCreate, owner_id: int):
 
 
 def get_projects(db: Session, user_id):
+    """List projects owned by or shared with a user."""
     project_rows = (
         db.query(Project.id)
         .filter(
@@ -90,11 +109,12 @@ def get_projects(db: Session, user_id):
 
 
 def invite_user(
-    db: Session, 
-    project_id: int, 
-    username: str, 
-    user_id: int
+    db: Session,
+    project_id: int,
+    username: str,
+    user_id: int,
 ):
+    """Add a user as a participant when called by the project owner."""
     project = (
         db.query(Project)
         .filter(Project.id == project_id)
@@ -103,13 +123,13 @@ def invite_user(
 
     if not project:
         raise HTTPException(
-            status_code=404, 
+            status_code=404,
             detail="Project not found"
         )
 
     if project.owner_id != user_id:
         raise HTTPException(
-            status_code=403, 
+            status_code=403,
             detail="Only project owner can invite users"
         )
 
@@ -121,20 +141,22 @@ def invite_user(
 
     if not invited_user:
         raise HTTPException(
-            status_code=404, 
+            status_code=404,
             detail="User not found"
         )
 
     existing_member = (
         db.query(ProjectMember)
-        .filter(ProjectMember.project_id == project_id, 
-                ProjectMember.user_id == invited_user.id)
+        .filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == invited_user.id,
+        )
         .first()
     )
 
     if existing_member:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail="User already has access"
         )
 
@@ -150,10 +172,11 @@ def invite_user(
 
 
 def get_project_info(
-    db: Session, 
-    project_id: int, 
-    user_id: int
+    db: Session,
+    project_id: int,
+    user_id: int,
 ):
+    """Return project details to an authorized project member."""
     project = (
         db.query(Project)
         .filter(Project.id == project_id)
@@ -162,20 +185,22 @@ def get_project_info(
 
     if not project:
         raise HTTPException(
-            status_code=404, 
+            status_code=404,
             detail="Project not found"
         )
-     
+
     project_members = (
         db.query(ProjectMember)
         .filter(ProjectMember.project_id == project_id)
         .all()
     )
 
-    if (project.owner_id != user_id 
-        and user_id not in project_members):
+    if (
+        project.owner_id != user_id
+        and user_id not in project_members
+    ):
         raise HTTPException(
-            status_code=403, 
+            status_code=403,
             detail="User doesn't have acces to project"
         )
 
@@ -183,11 +208,12 @@ def get_project_info(
 
 
 def update_project_info(
-    db: Session, 
-    project_id: int, 
+    db: Session,
+    project_id: int,
     project_data: ProjectUpdate,
-    user_id: int
+    user_id: int,
 ):
+    """Update a project's name and description for an authorized member."""
     project = (
         db.query(Project)
         .filter(Project.id == project_id)
@@ -196,7 +222,7 @@ def update_project_info(
 
     if not project:
         raise HTTPException(
-            status_code=404, 
+            status_code=404,
             detail="Project not found"
         )
 
@@ -204,14 +230,14 @@ def update_project_info(
         db.query(ProjectMember)
         .filter(
             ProjectMember.project_id == project_id,
-            ProjectMember.user_id == user_id
+            ProjectMember.user_id == user_id,
         )
         .first()
     )
 
     if not membership and project.owner_id != user_id:
         raise HTTPException(
-            status_code=403, 
+            status_code=403,
             detail="Only project members can update project infos"
         )
 
@@ -224,10 +250,11 @@ def update_project_info(
 
 
 def delete_project(
-    db: Session, 
-    project_id: int, 
-    user_id: int
+    db: Session,
+    project_id: int,
+    user_id: int,
 ):
+    """Delete a project and its membership records if called by its owner."""
     project = (
         db.query(Project)
         .filter(Project.id == project_id)
@@ -236,13 +263,13 @@ def delete_project(
 
     if not project:
         raise HTTPException(
-            status_code=404, 
+            status_code=404,
             detail="Project not found"
         )
 
     if project.owner_id != user_id:
         raise HTTPException(
-            status_code=403, 
+            status_code=403,
             detail="Only project owner can delete project"
         )
 
@@ -256,34 +283,35 @@ def delete_project(
 
 
 def get_project_documents(
-    db: Session, 
-    project_id: int, 
-    user_id: int
+    db: Session,
+    project_id: int,
+    user_id: int,
 ):
+    """List project documents for an authorized project member."""
     project = (
-            db.query(Project)
-            .filter(Project.id == project_id)
-            .first()
-        )
-    
+        db.query(Project)
+        .filter(Project.id == project_id)
+        .first()
+    )
+
     if not project:
         raise HTTPException(
-            status_code=404, 
+            status_code=404,
             detail="Project not found"
         )
-    
+
     membership = (
         db.query(ProjectMember)
         .filter(
             ProjectMember.project_id == project_id,
-            ProjectMember.user_id == user_id
+            ProjectMember.user_id == user_id,
         )
         .first()
     )
 
     if not membership and project.owner_id != user_id:
         raise HTTPException(
-            status_code=403, 
+            status_code=403,
             detail="Only project members can list project documents"
         )
 
@@ -300,38 +328,39 @@ def upload_project_document(
     db: Session,
     project_id: int,
     file: UploadFile,
-    user_id: int
+    user_id: int,
 ):
+    """Save an uploaded file and create its project document record."""
     os.makedirs("uploads", exist_ok=True)
-    
+
     project = (
         db.query(Project)
         .filter(Project.id == project_id)
         .first()
     )
-    
+
     if not project:
         raise HTTPException(
-            status_code=404, 
+            status_code=404,
             detail="Project not found"
         )
-    
+
     membership = (
         db.query(ProjectMember)
         .filter(
             ProjectMember.project_id == project_id,
-            ProjectMember.user_id == user_id
+            ProjectMember.user_id == user_id,
         )
         .first()
     )
 
     if not membership and project.owner_id != user_id:
         raise HTTPException(
-            status_code=403, 
+            status_code=403,
             detail="Only project members can upload documents"
         )
 
-    unique_name = (f"{uuid.uuid4()}_{file.filename}")
+    unique_name = f"{uuid.uuid4()}_{file.filename}"
     file_path = os.path.join("uploads", unique_name)
 
     with open(file_path, "wb") as buffer:
@@ -342,12 +371,10 @@ def upload_project_document(
         stored_filename=unique_name,
         file_path=file_path,
         project_id=project_id,
-        uploaded_by=user_id
+        uploaded_by=user_id,
     )
 
     db.add(document)
     db.commit()
     db.refresh(document)
     return document
-
-
