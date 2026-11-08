@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, Enum as SqlEnum
+from app.enums.project_role import ProjectRole
 from app.db.database import Base
 
 class ProjectMember(Base):
@@ -6,4 +7,4 @@ class ProjectMember(Base):
     id = Column(Integer, primary_key=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    role = Column(String(20), nullable=False)
+    role = Column(SqlEnum(ProjectRole), nullable=False)

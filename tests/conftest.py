@@ -1,6 +1,13 @@
 import pytest
+from fastapi.testclient import TestClient
 from app.db.database import SessionLocal
+from app.main import app
 from sqlalchemy import text
+
+
+@pytest.fixture
+def client():
+    return TestClient(app)
 
 
 @pytest.fixture(autouse=True)

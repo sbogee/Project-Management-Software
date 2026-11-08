@@ -1,70 +1,34 @@
-from fastapi.testclient import TestClient
-from app.main import app
-
-client = TestClient(app)
+import pytest
+from test_helpers import login_user, register_user
 
 
-def test_register_user():
-    response = client.post("/auth",
-                           json = {"username": "testuser",
-                                   "password": "password123"})
-
+def test_register_user(client):
+    response = register_user(client)
     assert response.status_code == 200
-    body = response.json()
-    assert body["username"] == "testuser"
+    assert response.json()["username"] == "testuser"
 
 
-def test_register_existing_user():
-    response = client.post("/auth",
-                           json = {"username": "testuser",
-                                   "password": "password123"})
-
-    assert response.status_code == 200
-
-    response = client.post("/auth",
-                           json = {"username": "testuser",
-                                   "password": "password123"})
-
+def test_register_existing_user(client):
+    register_user(client)
+    response = register_user(client)
     assert response.status_code == 400
     assert response.json() == {"detail": "User already exists"}
 
 
-def test_login_user():
-    response = client.post("/auth",
-                           json = {"username": "testuser",
-                                   "password": "password123"})
-    
+def test_login_user(client):
+    register_user(client)
+    response = login_user(client)
     assert response.status_code == 200
-
-    response = client.post("/login",
-                           data = {"username": "testuser",
-                                   "password": "password123"})
-
-    assert response.status_code == 200
-
-    token = response.json()
-    assert "access_token" in token
+    assert "access_token" in response.json()
 
 
-def test_login_non_existing_user():
-    response = client.post("/login",
-                           data = {"username": "testuser",
-                                   "password": "password123"})
-
-    assert response.status_code == 401
-    assert response.json() == {"detail": "Invalid credentials"}
-
-
-def test_login_user_with_bad_password():
-    response = client.post("/auth",
-                           json = {"username": "testuser",
-                                   "password": "password123"})
-    
-    assert response.status_code == 200
-
-    response = client.post("/login",
-                           data = {"username": "testuser",
-                                   "password": "password"})
-
+@pytest.mark.parametrize(
+    ("register_first", "password"),
+    [(False, "password123"), (True, "wrong-password")],
+)
+def test_login_rejects_invalid_credentials(client, register_first, password):
+    if register_first:
+        register_user(client)
+    response = login_user(client, password=password)
     assert response.status_code == 401
     assert response.json() == {"detail": "Invalid credentials"}
