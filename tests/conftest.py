@@ -1,8 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
+
 from app.db.database import SessionLocal
 from app.main import app
-from sqlalchemy import text
 
 
 @pytest.fixture
@@ -14,14 +15,16 @@ def client():
 def clean_database():
     db = SessionLocal()
 
-    db.execute(text(
-        "TRUNCATE TABLE "
-        "documents, "
-        "project_members, "
-        "projects, "
-        "users "
-        "RESTART IDENTITY CASCADE"
-    ))
+    db.execute(
+        text(
+            "TRUNCATE TABLE "
+            "documents, "
+            "project_members, "
+            "projects, "
+            "users "
+            "RESTART IDENTITY CASCADE"
+        )
+    )
 
     db.commit()
     db.close()

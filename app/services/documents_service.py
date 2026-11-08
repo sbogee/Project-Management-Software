@@ -1,16 +1,18 @@
-from sqlalchemy.orm import Session
-from app.models.project import Project
-from app.models.project_member import ProjectMember
-from app.models.document import Document
-from fastapi import HTTPException, UploadFile
-import uuid
 import os
+import uuid
+
+from fastapi import HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
+
+from app.models.document import Document
+from app.models.project_member import ProjectMember
+
 
 def download_document(
     db: Session,
     document_id: int,
-    user_id: int
+    user_id: int,
 ):
     document = (
         db.query(Document)
@@ -28,14 +30,14 @@ def download_document(
         db.query(ProjectMember)
         .filter(
             ProjectMember.project_id == document.project_id,
-            ProjectMember.user_id == user_id
+            ProjectMember.user_id == user_id,
         )
         .first()
     )
 
     if not membership:
         raise HTTPException(
-            status_code=403, 
+            status_code=403,
             detail="Only project members can download documents"
         )
 
@@ -46,17 +48,17 @@ def download_document(
         )
 
     return FileResponse(
-        path=document.file_path, 
-        filename=document.filename, 
-        media_type="application/octet-stream"
+        path=document.file_path,
+        filename=document.filename,
+        media_type="application/octet-stream",
     )
 
 
 def update_document(
-    db: Session, 
-    document_id: int, 
+    db: Session,
+    document_id: int,
     file: UploadFile,
-    user_id: int
+    user_id: int,
 ):
     document = (
         db.query(Document)
@@ -66,7 +68,7 @@ def update_document(
 
     if not document:
         raise HTTPException(
-            status_code=404, 
+            status_code=404,
             detail="Document not found"
         )
 
@@ -74,21 +76,21 @@ def update_document(
         db.query(ProjectMember)
         .filter(
             ProjectMember.project_id == document.project_id,
-            ProjectMember.user_id == user_id
+            ProjectMember.user_id == user_id,
         )
         .first()
     )
 
     if not membership:
         raise HTTPException(
-            status_code=403, 
+            status_code=403,
             detail="Only project members can update documents"
         )
 
     if os.path.exists(document.file_path):
         os.remove(document.file_path)
 
-    unique_name = (f"{uuid.uuid4()}_{file.filename}")
+    unique_name = f"{uuid.uuid4()}_{file.filename}"
 
     file_path = os.path.join("uploads", unique_name)
 
@@ -106,9 +108,9 @@ def update_document(
 
 
 def delete_document(
-    db: Session, 
-    document_id: int, 
-    user_id: int
+    db: Session,
+    document_id: int,
+    user_id: int,
 ):
     document = (
         db.query(Document)
@@ -118,7 +120,7 @@ def delete_document(
 
     if not document:
         raise HTTPException(
-            status_code=404, 
+            status_code=404,
             detail="Document not found"
         )
 
@@ -126,14 +128,14 @@ def delete_document(
         db.query(ProjectMember)
         .filter(
             ProjectMember.project_id == document.project_id,
-            ProjectMember.user_id == user_id
+            ProjectMember.user_id == user_id,
         )
         .first()
     )
 
     if not membership:
         raise HTTPException(
-            status_code=403, 
+            status_code=403,
             detail="Only project members can delete documents"
         )
 

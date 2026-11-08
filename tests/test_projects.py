@@ -1,5 +1,7 @@
-import pytest
 from pathlib import Path
+
+import pytest
+
 from app.db.database import SessionLocal
 from app.enums.project_role import ProjectRole
 from app.models.document import Document
@@ -8,13 +10,13 @@ from app.schemas.project import ProjectUpdate
 from test_helpers import (
     auth_headers,
     create_project,
+    delete_project,
+    get_project_documents,
+    get_project_info,
     invite_user,
     login_user,
     register_user,
-    get_project_info,
     update_project_info,
-    delete_project,
-    get_project_documents,
     upload_documents,
 )
 
@@ -129,7 +131,10 @@ def test_update_project_info_of_missing_project(client, owner_token):
         name="Updated Project",
         description="Updated description"
     )
-    assert update_project_info(client, owner_token, 1, project_data).status_code == 404
+    response = update_project_info(
+        client, owner_token, 1, project_data
+    )
+    assert response.status_code == 404
 
 
 def test_update_project_info_without_right(client, owner_token):
@@ -140,7 +145,10 @@ def test_update_project_info_without_right(client, owner_token):
         name="Updated Project",
         description="Updated description"
     )
-    assert update_project_info(client, member_token, 1, project_data).status_code == 403
+    response = update_project_info(
+        client, member_token, 1, project_data
+    )
+    assert response.status_code == 403
 
 
 def test_update_project_info(client, owner_token):
@@ -149,7 +157,10 @@ def test_update_project_info(client, owner_token):
         name="Updated Project",
         description="Updated description"
     )
-    assert update_project_info(client, owner_token, 1, project_data).status_code == 200
+    response = update_project_info(
+        client, owner_token, 1, project_data
+    )
+    assert response.status_code == 200
 
 
 def test_delete_missing_project(client, owner_token):

@@ -34,11 +34,13 @@ def invite_user(client, token, project_id, username):
         headers=auth_headers(token),
     )
 
+
 def get_project_info(client, token, project_id):
     return client.get(
         f"/projects/{project_id}/info",
         headers=auth_headers(token),
     )
+
 
 def update_project_info(client, token, project_id, project_data):
     return client.put(
@@ -47,11 +49,13 @@ def update_project_info(client, token, project_id, project_data):
         headers=auth_headers(token),
     )
 
+
 def delete_project(client, token, project_id):
     return client.delete(
         f"/projects/{project_id}",
-        headers=auth_headers(token)
+        headers=auth_headers(token),
     )
+
 
 def get_project_documents(client, token, project_id):
     return client.get(
@@ -59,13 +63,13 @@ def get_project_documents(client, token, project_id):
         headers=auth_headers(token),
     )
 
+
 def upload_documents(client, token, project_id, file):
     return client.post(
         f"/projects/{project_id}/documents",
         headers=auth_headers(token),
         files={"file": file},
     )
-
 
 def get_document(client, token, document_id):
     return client.get(

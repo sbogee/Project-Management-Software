@@ -40,7 +40,12 @@ def project_document(client, owner_token, project_id):
     document = response.json()
 
     with SessionLocal() as db:
-        original_path = db.query(Document).filter_by(id=document["id"]).one().file_path
+        original_path = (
+            db.query(Document)
+            .filter_by(id=document["id"])
+            .one()
+            .file_path
+        )
 
     yield document
 
