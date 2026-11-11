@@ -27,3 +27,16 @@ def projects_page(request: Request):
         request=request,
         name="projects.html"
     )
+
+@router.get("/projects-page/{project_id}")
+def project_details_page(
+    request: Request,
+    project_id: int
+):
+    return templates.TemplateResponse(
+        request=request,
+        name="project_details.html",
+        context={
+            "project_id": project_id
+        }
+    )

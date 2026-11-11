@@ -204,7 +204,7 @@ def get_project_info(
             detail="User doesn't have acces to project"
         )
 
-    return project.description
+    return _projects_with_member_user_ids(db, [project.id])
 
 
 def update_project_info(
