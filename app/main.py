@@ -1,11 +1,15 @@
 """FastAPI application setup and root endpoint."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
-from app.routers import auth, projects, documents
+from app.routers import auth, projects, documents, web
 from app.db.database import Base, engine
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 @asynccontextmanager
@@ -15,13 +19,9 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(documents.router)
-
-
-@app.get("/")
-def root():
-    """Return the API welcome message."""
-    return {"message": "Project Management API"}
+app.include_router(web.router)
