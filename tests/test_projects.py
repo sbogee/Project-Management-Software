@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-from app.db.database import SessionLocal
 from app.enums.project_role import ProjectRole
 from app.models.document import Document
 from app.models.project_member import ProjectMember
@@ -39,17 +38,16 @@ def create_project_data(client, token, name="Test Project"):
     return response.json()
 
 
-def test_create_project(client, owner_token):
+def test_create_project(client, db, owner_token):
     """Create a project and verify its owner membership."""
     project = create_project_data(client, owner_token)
     assert project["name"] == "Test Project"
 
-    with SessionLocal() as db:
-        membership = db.query(ProjectMember).filter_by(
-            project_id=project["id"],
-            user_id=project["owner_id"],
-        ).one()
-        assert membership.role == ProjectRole.OWNER
+    membership = db.query(ProjectMember).filter_by(
+        project_id=project["id"],
+        user_id=project["owner_id"],
+    ).one()
+    assert membership.role == ProjectRole.OWNER
 
 
 def test_list_users_projects(client, owner_token):
@@ -238,7 +236,7 @@ def test_upload_project_document_without_right(client, owner_token):
     assert response.status_code == 403
 
 
-def test_upload_project_document(client, owner_token):
+def test_upload_project_document(client, db, owner_token):
     """Allow the owner to upload a project document."""
     create_project_data(client, owner_token)
 
@@ -249,6 +247,5 @@ def test_upload_project_document(client, owner_token):
     assert response.json()["filename"] == "plan.txt"
     assert response.json()["project_id"] == 1
 
-    with SessionLocal() as db:
-        document = db.query(Document).filter_by(id=response.json()["id"]).one()
-        Path(document.file_path).unlink(missing_ok=True)
+    document = db.query(Document).filter_by(id=response.json()["id"]).one()
+    Path(document.file_path).unlink(missing_ok=True)

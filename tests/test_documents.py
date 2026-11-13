@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-from app.db.database import SessionLocal
 from app.models.document import Document
 from test_helpers import (
     create_project,
@@ -35,7 +34,7 @@ def project_id(client, owner_token):
 
 
 @pytest.fixture
-def project_document(client, owner_token, project_id):
+def project_document(client, db, owner_token, project_id):
     """Upload a document and remove its file after the test."""
     response = upload_documents(
         client, owner_token, project_id,
@@ -44,20 +43,18 @@ def project_document(client, owner_token, project_id):
     assert response.status_code == 200
     document = response.json()
 
-    with SessionLocal() as db:
-        original_path = (
-            db.query(Document)
-            .filter_by(id=document["id"])
-            .one()
-            .file_path
-        )
+    original_path = (
+        db.query(Document)
+        .filter_by(id=document["id"])
+        .one()
+        .file_path
+    )
 
     yield document
 
-    with SessionLocal() as db:
-        current = db.query(Document).filter_by(id=document["id"]).first()
-        if current:
-            Path(current.file_path).unlink(missing_ok=True)
+    current = db.query(Document).filter_by(id=document["id"]).first()
+    if current:
+        Path(current.file_path).unlink(missing_ok=True)
     Path(original_path).unlink(missing_ok=True)
 
 
