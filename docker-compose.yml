@@ -3,18 +3,22 @@ services:
     build: .
     container_name: project_management_api
 
-    ports:
-      - "8000:8000"
-
     environment:
       DATABASE_URL: postgresql+psycopg2://admin:admin@db:5432/project_management
-
 
     depends_on:
       - db
 
     volumes:
       - ./uploads:/app/uploads
+
+  web:
+    build: ./frontend
+    container_name: project_management_web
+    ports:
+      - "8000:80"
+    depends_on:
+      - api
 
   db:
     image: postgres:17
