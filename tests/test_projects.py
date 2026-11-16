@@ -197,6 +197,29 @@ def test_delete_project(client, owner_token):
     assert delete_project(client, owner_token, 1).status_code == 200
 
 
+def test_delete_project_with_documents(client, db, owner_token):
+    """Delete a project and its document records."""
+    project = create_project_data(client, owner_token)
+    upload_response = upload_documents(
+        client,
+        owner_token,
+        project["id"],
+        ("plan.txt", b"project plan", "text/plain"),
+    )
+    assert upload_response.status_code == 200
+
+    document = db.query(Document).filter_by(
+        id=upload_response.json()["id"]
+    ).one()
+    file_path = Path(document.file_path)
+
+    response = delete_project(client, owner_token, project["id"])
+
+    assert response.status_code == 200
+    assert db.query(Document).filter_by(project_id=project["id"]).count() == 0
+    file_path.unlink(missing_ok=True)
+
+
 def test_get_project_documents_of_missing_project(client, owner_token):
     """Return 404 when listing documents of a missing project."""
     assert get_project_documents(client, owner_token, 1).status_code == 404

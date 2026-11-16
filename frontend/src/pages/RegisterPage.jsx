@@ -55,47 +55,31 @@ export default function RegisterPage() {
                             <form onSubmit={handleRegister}>
                                 <div className="mb-3">
                                     <label className="form-label">Username</label>
-                                    <input
-                                        className="form-control"
-                                        value={username}
-                                        onChange={(e) => setUsername(e.target.value)}
-                                        required
-                                    />
+                                    <input className="form-control"
+                                           value={username}
+                                           onChange={(e) => setUsername(e.target.value)}
+                                           required/>
                                 </div>
                                 <div className="mb-3">
                                     <label className="form-label">Password</label>
-                                    <input
-                                        type="password"
-                                        className="form-control"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                    />
+                                    <input type="password"
+                                           className="form-control"
+                                           value={password}
+                                           onChange={(e) => setPassword(e.target.value)}
+                                           required/>
                                 </div>
                                 <button className="btn btn-success w-100">
                                     Register
                                 </button>
                             </form>
-                            {
-                                error &&
-                                (
-                                    <div className="alert alert-danger mt-3">
-                                        {error}
-                                    </div>
-                                )
-                            }
-                            {
-                                success &&
-                                (
-                                    <div className="alert alert-success mt-3">
-                                        {success}
-                                    </div>
-                                )
-                            }
+                            {error && (
+                                <div className="alert alert-danger mt-3">{error}</div>
+                            )}
+                            {success && (
+                                <div className="alert alert-success mt-3">{success}</div>
+                            )}
                             <div className="mt-3 text-center">
-                                <Link to="/">
-                                    Back to login
-                                </Link>
+                                <Link to="/">Back to login</Link>
                             </div>
                         </div>
                     </div>

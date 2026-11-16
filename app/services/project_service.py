@@ -273,9 +273,12 @@ def delete_project(
             detail="Only project owner can delete project"
         )
 
+    db.query(Document).filter(
+        Document.project_id == project_id
+    ).delete(synchronize_session=False)
     db.query(ProjectMember).filter(
         ProjectMember.project_id == project_id
-    ).delete()
+    ).delete(synchronize_session=False)
     db.delete(project)
     db.commit()
 

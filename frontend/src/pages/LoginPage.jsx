@@ -10,7 +10,8 @@ export default function LoginPage()
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
 
-    async function handleLogin(event) {
+    async function handleLogin(event) 
+    {
         event.preventDefault();
 
         const formData = new URLSearchParams();
@@ -22,8 +23,7 @@ export default function LoginPage()
             {
                 method: "POST",
                 headers: {
-                    "Content-Type":
-                        "application/x-www-form-urlencoded"
+                    "Content-Type": "application/x-www-form-urlencoded"
                 },
                 body: formData
             }
@@ -53,37 +53,26 @@ export default function LoginPage()
                             <form onSubmit={handleLogin}>
                                 <div className="mb-3">
                                     <label>Username</label>
-                                    <input
-                                        className="form-control"
-                                        value={username}
-                                        onChange={(e) => setUsername(e.target.value)}
-                                    />
+                                    <input className="form-control"
+                                           value={username}
+                                           onChange={(e) => setUsername(e.target.value)}/>
                                 </div>
                                 <div className="mb-3">
                                     <label>Password</label>
-                                    <input
-                                        type="password"
-                                        className="form-control"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                    />
+                                    <input type="password"
+                                           className="form-control"
+                                           value={password}
+                                           onChange={(e) => setPassword(e.target.value)}/>
                                 </div>
                                 <button className="btn btn-primary w-100">
                                     Login
                                 </button>
                             </form>
-                            {
-                                error &&
-                                (
-                                    <div className="text-danger mt-3">
-                                        {error}
-                                    </div>
-                                )
-                            }
+                            {error && (
+                                <div className="text-danger mt-3">{error}</div>
+                            )}
                             <div className="mt-3 text-center">
-                                <Link to="/register">
-                                    Create account
-                                </Link>
+                                <Link to="/register">Create account</Link>
                             </div>
                         </div>
                     </div>
