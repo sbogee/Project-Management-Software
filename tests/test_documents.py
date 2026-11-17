@@ -125,8 +125,16 @@ def test_delete_document_without_right(client, project_document):
     assert response.status_code == 403
 
 
-def test_delete_document(client, owner_token, project_document):
+def test_delete_document(client, db, owner_token, project_document):
     """Delete an existing document for its owner."""
+    document = db.query(Document).filter_by(
+        id=project_document["id"]
+    ).one()
+    file_path = Path(document.file_path)
+    assert file_path.exists()
+
     response = delete_document(client, owner_token, project_document["id"])
+
     assert response.status_code == 200
     assert response.json() == {"message": "Document deleted successfully"}
+    assert not file_path.exists()
