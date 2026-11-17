@@ -7,6 +7,7 @@ from fastapi import HTTPException, UploadFile
 from sqlalchemy import case
 from sqlalchemy.orm import Session
 
+from app.core.logger import logger
 from app.enums.project_role import ProjectRole
 from app.models.document import Document
 from app.models.project import Project
@@ -86,6 +87,10 @@ def create_project(
     db.add(owner_member)
     db.commit()
 
+    logger.info(
+        "Project created - " +
+        f"Project ID={project.id}"
+    )
     return _projects_with_member_user_ids(db, [project.id])[0]
 
 
@@ -105,6 +110,11 @@ def get_projects(db: Session, user_id):
     )
 
     project_ids = [project_id for (project_id,) in project_rows]
+
+    logger.info(
+        "Projects are listed - " +
+        f"User ID={user_id}"
+    )
     return _projects_with_member_user_ids(db, project_ids)
 
 
@@ -122,12 +132,21 @@ def invite_user(
     )
 
     if not project:
+        logger.info(
+            "Project doesn\'t exist - " +
+            f"Project ID={project_id}"
+        )
         raise HTTPException(
             status_code=404,
             detail="Project not found"
         )
 
     if project.owner_id != user_id:
+        logger.info(
+            "User doesn\'t have permission to invite others to the project - " +
+            f"Project ID={project_id} - " +
+            f"User ID={user_id}"
+        )
         raise HTTPException(
             status_code=403,
             detail="Only project owner can invite users"
@@ -140,6 +159,10 @@ def invite_user(
     )
 
     if not invited_user:
+        logger.info(
+            "User doesn\'t exist - " +
+            f"User ID={user_id}"
+        )
         raise HTTPException(
             status_code=404,
             detail="User not found"
@@ -155,6 +178,11 @@ def invite_user(
     )
 
     if existing_member:
+        logger.info(
+            "User is already added to project - " +
+            f"Project ID={project_id} - " +
+            f"User ID={invited_user.id}"
+        )
         raise HTTPException(
             status_code=400,
             detail="User already has access"
@@ -168,6 +196,11 @@ def invite_user(
     db.add(member)
     db.commit()
 
+    logger.info(
+        "User is invited successfully - " +
+        f"Project ID={project_id} - " +
+        f"User ID={invited_user.id}"
+    )
     return {"message": f"{username} invited successfully"}
 
 
@@ -184,6 +217,10 @@ def get_project_info(
     )
 
     if not project:
+        logger.info(
+            "Project doesn\'t exist - " +
+            f"Project ID={project_id}"
+        )
         raise HTTPException(
             status_code=404,
             detail="Project not found"
@@ -199,11 +236,21 @@ def get_project_info(
         project.owner_id != user_id
         and user_id not in project_members
     ):
+        logger.info(
+            "User doesn\'t have permission to get project info - " +
+            f"Project ID={project_id} - " +
+            f"User ID={user_id}"
+        )
         raise HTTPException(
             status_code=403,
             detail="User doesn't have acces to project"
         )
 
+    logger.info(
+        "Project info is returned successfully - " +
+        f"Project ID={project_id} - " +
+        f"User ID={user_id}"
+    )
     return _projects_with_member_user_ids(db, [project.id])
 
 
@@ -221,6 +268,10 @@ def update_project_info(
     )
 
     if not project:
+        logger.info(
+            "Project doesn\'t exist - " +
+            f"Project ID={project_id}"
+        )
         raise HTTPException(
             status_code=404,
             detail="Project not found"
@@ -236,6 +287,11 @@ def update_project_info(
     )
 
     if not membership and project.owner_id != user_id:
+        logger.info(
+            "User doesn\'t have permission to update project info - " +
+            f"Project ID={project_id} - " +
+            f"User ID={user_id}"
+        )
         raise HTTPException(
             status_code=403,
             detail="Only project members can update project infos"
@@ -246,6 +302,11 @@ def update_project_info(
     db.commit()
     db.refresh(project)
 
+    logger.info(
+        "Project info is updated successfully - " +
+        f"Project ID={project_id} - " +
+        f"User ID={user_id}"
+    )    
     return project
 
 
@@ -262,12 +323,21 @@ def delete_project(
     )
 
     if not project:
+        logger.info(
+            "Project doesn\'t exist - " +
+            f"Project ID={project_id}"
+        )
         raise HTTPException(
             status_code=404,
             detail="Project not found"
         )
 
     if project.owner_id != user_id:
+        logger.info(
+            "User doesn\'t have permission to delete project - " +
+            f"Project ID={project_id} - " +
+            f"User ID={user_id}"
+        )
         raise HTTPException(
             status_code=403,
             detail="Only project owner can delete project"
@@ -282,6 +352,11 @@ def delete_project(
     db.delete(project)
     db.commit()
 
+    logger.info(
+        "Project is deleted successfully - " +
+        f"Project ID={project_id} - " +
+        f"User ID={user_id}"
+    )
     return {"message": "Project deleted successfully"}
 
 
@@ -298,6 +373,10 @@ def get_project_documents(
     )
 
     if not project:
+        logger.info(
+            "Project doesn\'t exist - " +
+            f"Project ID={project_id}"
+        )
         raise HTTPException(
             status_code=404,
             detail="Project not found"
@@ -313,6 +392,11 @@ def get_project_documents(
     )
 
     if not membership and project.owner_id != user_id:
+        logger.info(
+            "User doesn\'t have permission to get project documents - " +
+            f"Project ID={project_id} - " +
+            f"User ID={user_id}"
+        )
         raise HTTPException(
             status_code=403,
             detail="Only project members can list project documents"
@@ -324,6 +408,11 @@ def get_project_documents(
         .all()
     )
 
+    logger.info(
+        "Project documents are returned successfully - " +
+        f"Project ID={project_id} - " +
+        f"User ID={user_id}"
+    )
     return documents
 
 
@@ -343,6 +432,10 @@ def upload_project_document(
     )
 
     if not project:
+        logger.info(
+            "Project doesn\'t exist - " +
+            f"Project ID={project_id}"
+        )
         raise HTTPException(
             status_code=404,
             detail="Project not found"
@@ -358,6 +451,11 @@ def upload_project_document(
     )
 
     if not membership and project.owner_id != user_id:
+        logger.info(
+            "User doesn\'t have permission to upload project documents - " +
+            f"Project ID={project_id} - " +
+            f"User ID={user_id}"
+        )
         raise HTTPException(
             status_code=403,
             detail="Only project members can upload documents"
@@ -380,4 +478,11 @@ def upload_project_document(
     db.add(document)
     db.commit()
     db.refresh(document)
+
+    logger.info(
+        "Document is uploaded successfully - " +
+        f"Document filename={file.filename} - " +
+        f"Project ID={project_id} - " +
+        f"User ID={user_id}"
+    )
     return document

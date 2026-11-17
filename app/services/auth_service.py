@@ -8,7 +8,9 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.core.logger import logger
 from app.schemas.user import UserCreate
+
 
 
 def create_user(db: Session, user: UserCreate):
@@ -24,6 +26,10 @@ def create_user(db: Session, user: UserCreate):
     )
 
     if existing_user:
+        logger.info(
+            "Username is already taken - " +
+            f"Username={user.username}"
+        )
         raise ValueError("User already exists")
 
     new_user = User(
@@ -33,6 +39,11 @@ def create_user(db: Session, user: UserCreate):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    logger.info(
+        "Registration successful - " +
+        f"Username={user.username}"
+    )
     return new_user
 
 
@@ -45,13 +56,25 @@ def login_user(db: Session, username: str, password: str):
     )
 
     if not existing_user:
+        logger.info(
+            "User doesn\'t exist - " +
+            f"Username={username}"
+        )
         return None
 
     if not verify_password(password, existing_user.password_hash):
+        logger.info(
+            "Password is incorrect - " +
+            f"Username={username}"
+        )
         return None
 
     token = create_access_token(
         {"sub": str(existing_user.id), "login": existing_user.username}
     )
 
+    logger.info(
+        "Login successful - " +
+        f"Username={username}"
+    )
     return token
