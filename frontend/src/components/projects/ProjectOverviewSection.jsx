@@ -1,9 +1,7 @@
 export default function ProjectOverviewSection({
     project,
-    isOwner,
     onBack,
     onEdit,
-    onDelete,
     onLogout
 }) {
     return (
@@ -22,11 +20,6 @@ export default function ProjectOverviewSection({
                 <button className="btn btn-warning me-2" onClick={onEdit}>
                     Update Project Info
                 </button>
-                {isOwner && (
-                    <button className="btn btn-danger" onClick={onDelete}>
-                        Delete Project
-                    </button>
-                )}
             </div>
             <p>{project.description}</p>
             <hr />

@@ -1,20 +1,47 @@
-function ProjectGroup({ title, projects, onOpen }) {
+function ProjectGroup({
+    title,
+    projects,
+    onOpen
+}) 
+{
     if (projects.length === 0) return null;
-
+        
     return (
         <>
-            <h3>{title}</h3>
-            {projects.map(project => (
-                <div key={project.id} className="card mb-3">
-                    <div className="card-body">
-                        <h5>{project.name}</h5>
-                        <button className="btn btn-primary"
-                                onClick={() => onOpen(project.id)}>
-                            Open
-                        </button>
-                    </div>
-                </div>
-            ))}
+            <h3 className="mb-3">{title}</h3>
+            <div className="table-responsive">
+                <table className="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Documents</th>
+                            <th width="120">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {projects.map(
+                            project => (
+                                <tr key={project.id}>
+                                    <td>
+                                        <strong>{project.name}</strong>
+                                    </td>
+                                    <td>
+                                        <span className="badge bg-secondary">
+                                            {project.documents.length}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button className="btn btn-primary btn-sm"
+                                                onClick={() => onOpen(project.id)}>
+                                            Open
+                                        </button>
+                                    </td>
+                                </tr>
+                            )
+                        )}
+                    </tbody>
+                </table>
+            </div>
         </>
     );
 }
@@ -27,7 +54,7 @@ export default function ProjectsList({
     if (ownedProjects.length === 0 && sharedProjects.length === 0) {
         return (
             <div className="alert alert-info">
-                No projects found.
+                No projects yet. Create your first project to get started.
             </div>
         );
     }

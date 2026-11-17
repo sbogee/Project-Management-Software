@@ -30,7 +30,6 @@ export default function ProjectDetailsPage() {
         <div className="container mt-4">
             <ProjectOverviewSection
                 project={project}
-                isOwner={isProjectOwner}
                 onBack={() => navigate("/projects")}
                 onEdit={() => details.setShowEditProjectModal(true)}
                 onDelete={() => details.setShowDeleteProjectModal(true)}
@@ -53,6 +52,15 @@ export default function ProjectDetailsPage() {
                     details.setDocumentToDelete(document);
                     details.setShowDeleteModal(true);
                 }}/>
+
+            <div className="mb-3">
+                {isProjectOwner && (
+                    <button className="btn btn-danger" 
+                            onClick={() => details.setShowDeleteProjectModal(true)}>
+                        Delete Project
+                    </button>
+                )}
+            </div>
 
             <EditProjectModal
                 show={details.showEditProjectModal}
