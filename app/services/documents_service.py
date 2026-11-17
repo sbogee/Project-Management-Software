@@ -30,7 +30,7 @@ def download_document(
     if not document:
         logger.info(
             "Document doesn\'t exist - " +
-            f"Document ID={document.id}"
+            f"Document ID={document_id}"
         )
         raise HTTPException(
             status_code=404,
@@ -99,7 +99,7 @@ def update_document(
     if not document:
         logger.info(
             "Document doesn\'t exist - " +
-            f"Document ID={document.id}"
+            f"Document ID={document_id}"
         )
         raise HTTPException(
             status_code=404,
@@ -170,7 +170,7 @@ def delete_document(
     if not document:
         logger.info(
             "Document doesn\'t exist - " +
-            f"Document ID={document.id}"
+            f"Document ID={document_id}"
         )
         raise HTTPException(
             status_code=404,
