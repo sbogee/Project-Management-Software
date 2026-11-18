@@ -1,3 +1,5 @@
+"""Configure and expose the application logger."""
+
 import logging
 
 logging.basicConfig(

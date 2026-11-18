@@ -6,7 +6,6 @@ import os
 
 import pytest
 from botocore.exceptions import ClientError
-
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -20,14 +19,14 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "test-secret-key")
 os.environ.setdefault("AWS_REGION", "us-east-1")
 os.environ.setdefault("S3_BUCKET_NAME", "test-bucket")
 
-from app.main import app
-from app.db.database import Base
-from app.dependencies import get_db
+from app.main import app  # noqa: E402
+from app.db.database import Base  # noqa: E402
+from app.dependencies import get_db  # noqa: E402
 
 
 @asynccontextmanager
 async def _no_database_lifespan(_app):
-    """Skip application startup so tests never initialize the configured database."""
+    """Skip startup so tests do not initialize the configured database."""
     yield
 
 
@@ -45,9 +44,11 @@ def fake_s3(monkeypatch):
     objects = {}
 
     def upload_fileobj(fileobj, bucket, key):
+        """Store an uploaded object in the in-memory test bucket."""
         objects[(bucket, key)] = fileobj.read()
 
     def get_object(Bucket, Key):
+        """Return an object or raise an S3-style missing-key error."""
         try:
             content = objects[(Bucket, Key)]
         except KeyError as exc:
@@ -58,6 +59,7 @@ def fake_s3(monkeypatch):
         return {"Body": BytesIO(content)}
 
     def delete_object(Bucket, Key):
+        """Remove an object from the in-memory test bucket."""
         objects.pop((Bucket, Key), None)
         return {}
 
@@ -79,9 +81,10 @@ TestingSessionLocal = sessionmaker(
     bind=engine,
 )
 
+
 @pytest.fixture()
 def db():
-    """Create the test SQLite schema and yield a session, then clean both up."""
+    """Create the test schema, yield a session, and then clean up."""
     Base.metadata.create_all(bind=engine)
 
     db = TestingSessionLocal()
@@ -92,9 +95,10 @@ def db():
         db.close()
         Base.metadata.drop_all(bind=engine)
 
+
 @pytest.fixture()
 def client(db):
-    """Provide an API client whose database dependency uses the test session."""
+    """Provide an API client with the test database dependency."""
 
     def override_get_db():
         """Yield the test session for each request that needs a database."""

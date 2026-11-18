@@ -1,11 +1,14 @@
 """Business logic for projects and their documents."""
+
 import os
 import uuid
+
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
+
 from app.core.logger import logger
-from app.schemas.project import ProjectCreate, ProjectUpdate
 from app.repositories.repository import Repository
+from app.schemas.project import ProjectCreate, ProjectUpdate
 
 
 def _projects_with_member_user_ids(db: Session, project_ids: list[int]):
@@ -52,10 +55,7 @@ def create_project(
     repository = Repository(db)
     project = repository.create_project(project_data, owner_id)
 
-    logger.info(
-        "Project created - " +
-        f"Project ID={project.id}"
-    )
+    logger.info("Project created - Project ID=%s", project.id)
     return _projects_with_member_user_ids(db, [project.id])[0]
 
 
@@ -95,9 +95,10 @@ def invite_user(
 
     if project.owner_id != user_id:
         logger.info(
-            "User doesn\'t have permission to invite others to the project - " +
-            f"Project ID={project_id} - " +
-            f"User ID={user_id}"
+            "User doesn't have permission to invite others to the project - "
+            "Project ID=%s - User ID=%s",
+            project_id,
+            user_id,
         )
         raise HTTPException(
             status_code=403,
@@ -116,7 +117,10 @@ def invite_user(
             detail="User not found"
         )
 
-    existing_member = repository.get_project_member(project_id, invited_user.id)
+    existing_member = repository.get_project_member(
+        project_id,
+        invited_user.id,
+    )
 
     if existing_member:
         logger.info(
@@ -215,13 +219,17 @@ def update_project_info(
             detail="Only project members can update project infos"
         )
 
-    repository.update_project_info(project, project_data.name, project_data.description)
+    repository.update_project_info(
+        project,
+        project_data.name,
+        project_data.description,
+    )
 
     logger.info(
         "Project info is updated successfully - " +
         f"Project ID={project_id} - " +
         f"User ID={user_id}"
-    )    
+    )
     return project
 
 

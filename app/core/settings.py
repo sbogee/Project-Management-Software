@@ -1,3 +1,5 @@
+"""Load AWS credentials and storage settings from the environment."""
+
 import os
 
 from dotenv import load_dotenv

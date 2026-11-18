@@ -134,5 +134,10 @@ def test_delete_document(client, db, owner_token, project_document, fake_s3):
 
     assert response.status_code == 200
     assert response.json() == {"message": "Document deleted successfully"}
-    assert db.query(Document).filter_by(id=project_document["id"]).first() is None
+    assert (
+        db.query(Document)
+        .filter_by(id=project_document["id"])
+        .first()
+        is None
+    )
     assert (bucket, s3_key) not in fake_s3

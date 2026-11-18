@@ -8,9 +8,12 @@ load_dotenv()
 
 
 def _required_env(name: str) -> str:
+    """Return a required environment setting or raise a clear error."""
     value = os.getenv(name)
     if not value:
-        raise RuntimeError(f"{name} must be set in the environment or .env file")
+        raise RuntimeError(
+            f"{name} must be set in the environment or .env file"
+        )
     return value
 
 
