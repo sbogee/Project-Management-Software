@@ -1,14 +1,25 @@
 """Service operations for project documents."""
 
-import os
-import uuid
+from urllib.parse import quote
 
+from botocore.exceptions import ClientError
 from fastapi import HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.logger import logger
 from app.repositories.repository import Repository
+
+
+def _stream_body(body):
+    try:
+        while True:
+            chunk = body.read(64 * 1024)
+            if not chunk:
+                break
+            yield chunk
+    finally:
+        body.close()
 
 
 def download_document(
@@ -46,26 +57,34 @@ def download_document(
             detail="Only project members can download documents"
         )
 
-    if not os.path.exists(document.file_path):
-        logger.info(
-            "Document doesn\'t exist at filepath - " +
-            f"Document ID={document.id} - " + 
-            f"Filepath={document.file_path}"
-        )
+    try:
+        body = repository.get_document_file(document)
+    except ValueError as exc:
         raise HTTPException(
             status_code=404,
-            detail="File not found on disk"
-        )
+            detail="File not found in storage",
+        ) from exc
+    except ClientError as exc:
+        error_code = exc.response.get("Error", {}).get("Code")
+        if error_code not in {"NoSuchKey", "NotFound", "404"}:
+            raise
+        raise HTTPException(
+            status_code=404,
+            detail="File not found in storage",
+        ) from exc
 
     logger.info(
         "Document downloaded - " +
         f"Document ID={document.id} - " +
         f"User ID={user_id}"
     )
-    return FileResponse(
-        path=document.file_path,
-        filename=document.filename,
+    return StreamingResponse(
+        _stream_body(body),
         media_type="application/octet-stream",
+        headers={
+            "Content-Disposition":
+                f"attachment; filename*=UTF-8''{quote(document.filename, safe='')}"
+        },
     )
 
 

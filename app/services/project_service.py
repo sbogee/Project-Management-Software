@@ -13,14 +13,16 @@ def _projects_with_member_user_ids(db: Session, project_ids: list[int]):
     repository = Repository(db)
     rows = repository.get_project_member_rows(project_ids)
 
-    member_user_ids = {project.id: [] for project, _ in rows}
+    projects_by_id = {}
+    member_user_ids = {project_id: [] for project_id in project_ids}
     for project, user_id in rows:
-        if user_id is None and user_id != project.owner_id:
+        projects_by_id[project.id] = project
+        if user_id is not None:
             member_user_ids[project.id].append(user_id)
 
     document_rows = repository.get_project_document_rows(project_ids)
 
-    project_documents = {project.id: [] for project, _ in rows}
+    project_documents = {project_id: [] for project_id in project_ids}
     for project_id, document_id, filename in document_rows:
         project_documents[project_id].append({
             "id": document_id,
@@ -29,14 +31,15 @@ def _projects_with_member_user_ids(db: Session, project_ids: list[int]):
 
     return [
         {
-            "id": project.id,
-            "name": project.name,
-            "description": project.description,
-            "owner_id": project.owner_id,
-            "member_user_ids": member_user_ids[project.id],
-            "documents": project_documents[project.id],
+            "id": projects_by_id[project_id].id,
+            "name": projects_by_id[project_id].name,
+            "description": projects_by_id[project_id].description,
+            "owner_id": projects_by_id[project_id].owner_id,
+            "member_user_ids": member_user_ids[project_id],
+            "documents": project_documents[project_id],
         }
-        for project, _ in rows
+        for project_id in project_ids
+        if project_id in projects_by_id
     ]
 
 
@@ -311,8 +314,6 @@ def upload_project_document(
     user_id: int,
 ):
     """Save an uploaded file and create its project document record."""
-    os.makedirs("uploads", exist_ok=True)
-
     repository = Repository(db)
     project = repository.get_project_by_id(project_id)
 

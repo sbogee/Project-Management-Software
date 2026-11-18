@@ -1,7 +1,5 @@
 """Tests for document download, update, and deletion endpoints."""
 
-from pathlib import Path
-
 import pytest
 
 from app.models.document import Document
@@ -34,28 +32,14 @@ def project_id(client, owner_token):
 
 
 @pytest.fixture
-def project_document(client, db, owner_token, project_id):
-    """Upload a document and remove its file after the test."""
+def project_document(client, owner_token, project_id):
+    """Upload a document to the test S3 store."""
     response = upload_documents(
         client, owner_token, project_id,
         ("initial.txt", b"initial content", "text/plain"),
     )
     assert response.status_code == 200
-    document = response.json()
-
-    original_path = (
-        db.query(Document)
-        .filter_by(id=document["id"])
-        .one()
-        .file_path
-    )
-
-    yield document
-
-    current = db.query(Document).filter_by(id=document["id"]).first()
-    if current:
-        Path(current.file_path).unlink(missing_ok=True)
-    Path(original_path).unlink(missing_ok=True)
+    return response.json()
 
 
 def test_download_missing_document(client, owner_token):
@@ -100,8 +84,13 @@ def test_update_document_without_right(client, project_document):
     assert response.status_code == 403
 
 
-def test_update_document(client, owner_token, project_document):
-    """Replace a document's file for its owner."""
+def test_update_document(client, db, owner_token, project_document, fake_s3):
+    """Replace a document's S3 object for its owner."""
+    document = db.query(Document).filter_by(
+        id=project_document["id"]
+    ).one()
+    old_key = document.s3_key
+
     response = update_document(
         client, owner_token, project_document["id"],
         ("updated.txt", b"updated content", "text/plain"),
@@ -109,6 +98,14 @@ def test_update_document(client, owner_token, project_document):
 
     assert response.status_code == 200
     assert response.json()["filename"] == "updated.txt"
+    updated_document = db.query(Document).filter_by(
+        id=project_document["id"]
+    ).one()
+    assert updated_document.s3_key != old_key
+    assert (next(iter(fake_s3))[0], old_key) not in fake_s3
+    assert fake_s3[(next(iter(fake_s3))[0], updated_document.s3_key)] == (
+        b"updated content"
+    )
 
 
 def test_delete_missing_document(client, owner_token):
@@ -125,16 +122,17 @@ def test_delete_document_without_right(client, project_document):
     assert response.status_code == 403
 
 
-def test_delete_document(client, db, owner_token, project_document):
-    """Delete an existing document for its owner."""
+def test_delete_document(client, db, owner_token, project_document, fake_s3):
+    """Delete an existing document and its S3 object."""
     document = db.query(Document).filter_by(
         id=project_document["id"]
     ).one()
-    file_path = Path(document.file_path)
-    assert file_path.exists()
+    s3_key = document.s3_key
+    bucket = next(iter(fake_s3))[0]
 
     response = delete_document(client, owner_token, project_document["id"])
 
     assert response.status_code == 200
     assert response.json() == {"message": "Document deleted successfully"}
-    assert not file_path.exists()
+    assert db.query(Document).filter_by(id=project_document["id"]).first() is None
+    assert (bucket, s3_key) not in fake_s3

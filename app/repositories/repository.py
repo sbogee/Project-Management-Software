@@ -1,4 +1,7 @@
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from botocore.exceptions import ClientError
+
 from app.models.project import Project
 from app.models.project_member import ProjectMember
 from app.models.document import Document
@@ -7,9 +10,11 @@ from sqlalchemy import case
 from app.schemas.project import ProjectCreate
 from app.enums.project_role import ProjectRole
 from fastapi import UploadFile
-import os
 import uuid
 from app.core.security import hash_password
+from app.core.settings import S3_BUCKET_NAME
+from app.services.s3_service import s3_client
+from app.core.logger import logger
 
 class Repository:
     def __init__(self, db: Session):
@@ -88,6 +93,14 @@ class Repository:
 
 
     def delete_documents_by_project_id(self, project_id: int):
+        documents = self.get_project_documents(project_id)
+        for document in documents:
+            if document.s3_key:
+                s3_client.delete_object(
+                    Bucket=S3_BUCKET_NAME,
+                    Key=document.s3_key,
+                )
+
         self.db.query(Document).filter(
             Document.project_id == project_id
             ).delete(synchronize_session=False)
@@ -122,22 +135,40 @@ class Repository:
 
 
     def create_document(self, file: UploadFile, project_id: int, user_id: int):
-        unique_name = f"{uuid.uuid4()}_{file.filename}"
-        file_path = os.path.join("uploads", unique_name)
+        s3_key = (
+            f"projects/"
+            f"{project_id}/"
+            f"{uuid.uuid4()}_"
+            f"{file.filename}"
+        )
 
-        with open(file_path, "wb") as buffer:
-            buffer.write(file.file.read())
+        file.file.seek(0)
+        s3_client.upload_fileobj(
+            file.file,
+            S3_BUCKET_NAME,
+            s3_key
+        )
 
         document = Document(
             filename=file.filename,
-            stored_filename=unique_name,
-            file_path=file_path,
+            s3_key=s3_key,
             project_id=project_id,
             uploaded_by=user_id,
         )
 
         self.db.add(document)
-        self.db.commit()
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            try:
+                s3_client.delete_object(
+                    Bucket=S3_BUCKET_NAME,
+                    Key=s3_key,
+                )
+            except ClientError:
+                logger.exception("Failed to clean up uploaded S3 object")
+            raise
         self.db.refresh(document)
 
         return document
@@ -178,30 +209,58 @@ class Repository:
 
 
     def update_document(self, document: Document, file: UploadFile):
-        if os.path.exists(document.file_path):
-            os.remove(document.file_path)
-
-        unique_name = f"{uuid.uuid4()}_{file.filename}"
-
-        file_path = os.path.join("uploads", unique_name)
-
-        with open(file_path, "wb") as buffer:
-            buffer.write(file.file.read())
+        old_s3_key = document.s3_key
+        new_s3_key = (
+            f"projects/{document.project_id}/"
+            f"{uuid.uuid4()}_{file.filename}"
+        )
+        file.file.seek(0)
+        s3_client.upload_fileobj(
+            file.file,
+            S3_BUCKET_NAME,
+            new_s3_key,
+        )
 
         document.filename = file.filename
-        document.stored_filename = unique_name
-        document.file_path = file_path
+        document.s3_key = new_s3_key
 
-        self.db.commit()
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            try:
+                s3_client.delete_object(
+                    Bucket=S3_BUCKET_NAME,
+                    Key=new_s3_key,
+                )
+            except ClientError:
+                logger.exception("Failed to clean up replacement S3 object")
+            raise
         self.db.refresh(document)
 
+        if old_s3_key:
+            s3_client.delete_object(
+                Bucket=S3_BUCKET_NAME,
+                Key=old_s3_key,
+            )
 
     def delete_document(self, document: Document):
-        if os.path.exists(document.file_path):
-            os.remove(document.file_path)
-    
+        if document.s3_key:
+            s3_client.delete_object(
+                Bucket=S3_BUCKET_NAME,
+                Key=document.s3_key,
+            )
+
         self.db.delete(document)
         self.db.commit()
+
+    def get_document_file(self, document: Document):
+        if not document.s3_key:
+            raise ValueError(f"Document {document.id} has no S3 object key")
+        return s3_client.get_object(
+            Bucket=S3_BUCKET_NAME,
+            Key=document.s3_key,
+        )["Body"]
 
 
     def get_user(self, user_name: str):

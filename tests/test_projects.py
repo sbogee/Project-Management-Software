@@ -1,7 +1,5 @@
 """Tests for project management and project document endpoints."""
 
-from pathlib import Path
-
 import pytest
 
 from app.enums.project_role import ProjectRole
@@ -197,8 +195,8 @@ def test_delete_project(client, owner_token):
     assert delete_project(client, owner_token, 1).status_code == 200
 
 
-def test_delete_project_with_documents(client, db, owner_token):
-    """Delete a project and its document records."""
+def test_delete_project_with_documents(client, db, owner_token, fake_s3):
+    """Delete a project, its document records, and their S3 objects."""
     project = create_project_data(client, owner_token)
     upload_response = upload_documents(
         client,
@@ -211,13 +209,15 @@ def test_delete_project_with_documents(client, db, owner_token):
     document = db.query(Document).filter_by(
         id=upload_response.json()["id"]
     ).one()
-    file_path = Path(document.file_path)
+    s3_key = document.s3_key
+    bucket = next(iter(fake_s3))[0]
+    assert (bucket, s3_key) in fake_s3
 
     response = delete_project(client, owner_token, project["id"])
 
     assert response.status_code == 200
     assert db.query(Document).filter_by(project_id=project["id"]).count() == 0
-    file_path.unlink(missing_ok=True)
+    assert (bucket, s3_key) not in fake_s3
 
 
 def test_get_project_documents_of_missing_project(client, owner_token):
@@ -259,8 +259,8 @@ def test_upload_project_document_without_right(client, owner_token):
     assert response.status_code == 403
 
 
-def test_upload_project_document(client, db, owner_token):
-    """Allow the owner to upload a project document."""
+def test_upload_project_document(client, db, owner_token, fake_s3):
+    """Allow the owner to upload a project document to S3."""
     create_project_data(client, owner_token)
 
     response = upload_documents(
@@ -271,4 +271,6 @@ def test_upload_project_document(client, db, owner_token):
     assert response.json()["project_id"] == 1
 
     document = db.query(Document).filter_by(id=response.json()["id"]).one()
-    Path(document.file_path).unlink(missing_ok=True)
+    bucket, key = next(iter(fake_s3))
+    assert document.s3_key == key
+    assert fake_s3[(bucket, key)] == b"project plan"
