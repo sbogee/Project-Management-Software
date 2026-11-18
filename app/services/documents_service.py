@@ -8,8 +8,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.logger import logger
-from app.models.document import Document
-from app.models.project_member import ProjectMember
+from app.repositories.repository import Repository
 
 
 def download_document(
@@ -21,11 +20,8 @@ def download_document(
     Raises:
         HTTPException: If the document or file is missing, or access is denied.
     """
-    document = (
-        db.query(Document)
-        .filter(Document.id == document_id)
-        .first()
-    )
+    repository = Repository(db)
+    document = repository.get_document(document_id)
 
     if not document:
         logger.info(
@@ -37,14 +33,7 @@ def download_document(
             detail="Document not found"
         )
 
-    membership = (
-        db.query(ProjectMember)
-        .filter(
-            ProjectMember.project_id == document.project_id,
-            ProjectMember.user_id == user_id,
-        )
-        .first()
-    )
+    membership = repository.get_project_member(document.project_id, user_id)
 
     if not membership:
         logger.info(
@@ -90,11 +79,8 @@ def update_document(
     Raises:
         HTTPException: If the document is missing or access is denied.
     """
-    document = (
-        db.query(Document)
-        .filter(Document.id == document_id)
-        .first()
-    )
+    repository = Repository(db)
+    document = repository.get_document(document_id)
 
     if not document:
         logger.info(
@@ -106,14 +92,7 @@ def update_document(
             detail="Document not found"
         )
 
-    membership = (
-        db.query(ProjectMember)
-        .filter(
-            ProjectMember.project_id == document.project_id,
-            ProjectMember.user_id == user_id,
-        )
-        .first()
-    )
+    membership = repository.get_project_member(document.project_id, user_id)
 
     if not membership:
         logger.info(
@@ -126,22 +105,7 @@ def update_document(
             detail="Only project members can update documents"
         )
 
-    if os.path.exists(document.file_path):
-        os.remove(document.file_path)
-
-    unique_name = f"{uuid.uuid4()}_{file.filename}"
-
-    file_path = os.path.join("uploads", unique_name)
-
-    with open(file_path, "wb") as buffer:
-        buffer.write(file.file.read())
-
-    document.filename = file.filename
-    document.stored_filename = unique_name
-    document.file_path = file_path
-
-    db.commit()
-    db.refresh(document)
+    repository.update_document(document, file)
 
     logger.info(
         "Document updated - " +
@@ -161,11 +125,8 @@ def delete_document(
     Raises:
         HTTPException: If the document is missing or access is denied.
     """
-    document = (
-        db.query(Document)
-        .filter(Document.id == document_id)
-        .first()
-    )
+    repository = Repository(db)
+    document = repository.get_document(document_id)
 
     if not document:
         logger.info(
@@ -177,14 +138,7 @@ def delete_document(
             detail="Document not found"
         )
 
-    membership = (
-        db.query(ProjectMember)
-        .filter(
-            ProjectMember.project_id == document.project_id,
-            ProjectMember.user_id == user_id,
-        )
-        .first()
-    )
+    membership = repository.get_project_member(document.project_id, user_id)
 
     if not membership:
         logger.info(
@@ -197,11 +151,7 @@ def delete_document(
             detail="Only project members can delete documents"
         )
 
-    if os.path.exists(document.file_path):
-        os.remove(document.file_path)
-
-    db.delete(document)
-    db.commit()
+    repository.delete_document(document)
 
     logger.info(
         "Document deleted - " +

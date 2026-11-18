@@ -10,7 +10,7 @@ from app.core.security import (
 )
 from app.core.logger import logger
 from app.schemas.user import UserCreate
-
+from app.repositories.repository import Repository
 
 
 def create_user(db: Session, user: UserCreate):
@@ -19,11 +19,8 @@ def create_user(db: Session, user: UserCreate):
     Raises:
         ValueError: If the username is already registered.
     """
-    existing_user = (
-        db.query(User)
-        .filter(User.username == user.username)
-        .first()
-    )
+    repository = Repository(db)
+    existing_user = repository.get_user(user.username)
 
     if existing_user:
         logger.info(
@@ -32,13 +29,7 @@ def create_user(db: Session, user: UserCreate):
         )
         raise ValueError("User already exists")
 
-    new_user = User(
-        username=user.username,
-        password_hash=hash_password(user.password),
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    new_user = repository.create_user(user.username, user.password)
 
     logger.info(
         "Registration successful - " +
@@ -49,11 +40,8 @@ def create_user(db: Session, user: UserCreate):
 
 def login_user(db: Session, username: str, password: str):
     """Return an access token for valid credentials, or None otherwise."""
-    existing_user = (
-        db.query(User)
-        .filter(User.username == username)
-        .first()
-    )
+    repository = Repository(db)
+    existing_user = repository.get_user(username)
 
     if not existing_user:
         logger.info(

@@ -7,8 +7,9 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
+from app.core.config import SECRET_KEY
+
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
-SECRET_KEY = "super-secret-key"
 ALGORITHM = "HS256"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

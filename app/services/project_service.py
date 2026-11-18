@@ -1,66 +1,42 @@
 """Business logic for projects and their documents."""
-
 import os
 import uuid
-
 from fastapi import HTTPException, UploadFile
-from sqlalchemy import case
 from sqlalchemy.orm import Session
-
 from app.core.logger import logger
-from app.enums.project_role import ProjectRole
-from app.models.document import Document
-from app.models.project import Project
-from app.models.project_member import ProjectMember
-from app.models.user import User
 from app.schemas.project import ProjectCreate, ProjectUpdate
+from app.repositories.repository import Repository
 
 
 def _projects_with_member_user_ids(db: Session, project_ids: list[int]):
     """Build project response data with member and document identifiers."""
-    projects = (
-        db.query(Project)
-        .filter(Project.id.in_(project_ids))
-        .all()
-    )
-    projects_by_id = {project.id: project for project in projects}
+    repository = Repository(db)
+    rows = repository.get_project_member_rows(project_ids)
 
-    member_rows = (
-        db.query(ProjectMember.project_id, ProjectMember.user_id)
-        .filter(ProjectMember.project_id.in_(project_ids))
-        .all()
-    )
-    member_user_ids = {project_id: [] for project_id in project_ids}
-    for project_id, user_id in member_rows:
-        member_user_ids[project_id].append(user_id)
+    member_user_ids = {project.id: [] for project, _ in rows}
+    for project, user_id in rows:
+        if user_id is None and user_id != project.owner_id:
+            member_user_ids[project.id].append(user_id)
 
-    document_rows = (
-        db.query(Document.project_id, Document.id, Document.filename)
-        .filter(Document.project_id.in_(project_ids))
-        .all()
-    )
-    project_documents = {
-        project_id: []
-        for project_id in project_ids
-    }
+    document_rows = repository.get_project_document_rows(project_ids)
+
+    project_documents = {project.id: [] for project, _ in rows}
     for project_id, document_id, filename in document_rows:
-        project_documents[project_id].append(
-            {
-                "id": document_id,
-                "filename": filename,
-            }
-        )
+        project_documents[project_id].append({
+            "id": document_id,
+            "filename": filename,
+        })
 
     return [
         {
-            "id": project_id,
-            "name": projects_by_id[project_id].name,
-            "description": projects_by_id[project_id].description,
-            "owner_id": projects_by_id[project_id].owner_id,
-            "member_user_ids": member_user_ids[project_id],
-            "documents": project_documents[project_id],
+            "id": project.id,
+            "name": project.name,
+            "description": project.description,
+            "owner_id": project.owner_id,
+            "member_user_ids": member_user_ids[project.id],
+            "documents": project_documents[project.id],
         }
-        for project_id in project_ids
+        for project, _ in rows
     ]
 
 
@@ -70,22 +46,8 @@ def create_project(
     owner_id: int,
 ):
     """Create a project and add its owner as an owner-role member."""
-    project = Project(
-        name=project_data.name,
-        description=project_data.description,
-        owner_id=owner_id,
-    )
-    db.add(project)
-    db.commit()
-    db.refresh(project)
-
-    owner_member = ProjectMember(
-        project_id=project.id,
-        user_id=owner_id,
-        role=ProjectRole.OWNER,
-    )
-    db.add(owner_member)
-    db.commit()
+    repository = Repository(db)
+    project = repository.create_project(project_data, owner_id)
 
     logger.info(
         "Project created - " +
@@ -96,18 +58,8 @@ def create_project(
 
 def get_projects(db: Session, user_id):
     """List projects owned by or shared with a user."""
-    project_rows = (
-        db.query(Project.id)
-        .filter(
-            (Project.owner_id == user_id)
-            | Project.id.in_(
-                db.query(ProjectMember.project_id)
-                .filter(ProjectMember.user_id == user_id)
-            )
-        )
-        .order_by(case((Project.owner_id == user_id, 0), else_=1))
-        .all()
-    )
+    repository = Repository(db)
+    project_rows = repository.get_project_ids_for_user(user_id)
 
     project_ids = [project_id for (project_id,) in project_rows]
 
@@ -125,11 +77,8 @@ def invite_user(
     user_id: int,
 ):
     """Add a user as a participant when called by the project owner."""
-    project = (
-        db.query(Project)
-        .filter(Project.id == project_id)
-        .first()
-    )
+    repository = Repository(db)
+    project = repository.get_project_by_id(project_id)
 
     if not project:
         logger.info(
@@ -152,11 +101,7 @@ def invite_user(
             detail="Only project owner can invite users"
         )
 
-    invited_user = (
-        db.query(User)
-        .filter(User.username == username)
-        .first()
-    )
+    invited_user = repository.get_user_by_username(username)
 
     if not invited_user:
         logger.info(
@@ -168,14 +113,7 @@ def invite_user(
             detail="User not found"
         )
 
-    existing_member = (
-        db.query(ProjectMember)
-        .filter(
-            ProjectMember.project_id == project_id,
-            ProjectMember.user_id == invited_user.id,
-        )
-        .first()
-    )
+    existing_member = repository.get_project_member(project_id, invited_user.id)
 
     if existing_member:
         logger.info(
@@ -188,13 +126,7 @@ def invite_user(
             detail="User already has access"
         )
 
-    member = ProjectMember(
-        project_id=project_id,
-        user_id=invited_user.id,
-        role=ProjectRole.PARTICIPANT,
-    )
-    db.add(member)
-    db.commit()
+    member = repository.add_project_member(project_id, invited_user.id)
 
     logger.info(
         "User is invited successfully - " +
@@ -210,11 +142,8 @@ def get_project_info(
     user_id: int,
 ):
     """Return project details to an authorized project member."""
-    project = (
-        db.query(Project)
-        .filter(Project.id == project_id)
-        .first()
-    )
+    repository = Repository(db)
+    project = repository.get_project_by_id(project_id)
 
     if not project:
         logger.info(
@@ -226,11 +155,7 @@ def get_project_info(
             detail="Project not found"
         )
 
-    project_members = (
-        db.query(ProjectMember)
-        .filter(ProjectMember.project_id == project_id)
-        .all()
-    )
+    project_members = repository.get_project_members(project_id)
 
     if (
         project.owner_id != user_id
@@ -261,11 +186,8 @@ def update_project_info(
     user_id: int,
 ):
     """Update a project's name and description for an authorized member."""
-    project = (
-        db.query(Project)
-        .filter(Project.id == project_id)
-        .first()
-    )
+    repository = Repository(db)
+    project = repository.get_project_by_id(project_id)
 
     if not project:
         logger.info(
@@ -277,14 +199,7 @@ def update_project_info(
             detail="Project not found"
         )
 
-    membership = (
-        db.query(ProjectMember)
-        .filter(
-            ProjectMember.project_id == project_id,
-            ProjectMember.user_id == user_id,
-        )
-        .first()
-    )
+    membership = repository.get_project_member(project_id, user_id)
 
     if not membership and project.owner_id != user_id:
         logger.info(
@@ -297,10 +212,7 @@ def update_project_info(
             detail="Only project members can update project infos"
         )
 
-    project.name = project_data.name
-    project.description = project_data.description
-    db.commit()
-    db.refresh(project)
+    repository.update_project_info(project, project_data.name, project_data.description)
 
     logger.info(
         "Project info is updated successfully - " +
@@ -316,11 +228,8 @@ def delete_project(
     user_id: int,
 ):
     """Delete a project and its membership records if called by its owner."""
-    project = (
-        db.query(Project)
-        .filter(Project.id == project_id)
-        .first()
-    )
+    repository = Repository(db)
+    project = repository.get_project_by_id(project_id)
 
     if not project:
         logger.info(
@@ -343,14 +252,7 @@ def delete_project(
             detail="Only project owner can delete project"
         )
 
-    db.query(Document).filter(
-        Document.project_id == project_id
-    ).delete(synchronize_session=False)
-    db.query(ProjectMember).filter(
-        ProjectMember.project_id == project_id
-    ).delete(synchronize_session=False)
-    db.delete(project)
-    db.commit()
+    repository.delete_project(project)
 
     logger.info(
         "Project is deleted successfully - " +
@@ -366,11 +268,8 @@ def get_project_documents(
     user_id: int,
 ):
     """List project documents for an authorized project member."""
-    project = (
-        db.query(Project)
-        .filter(Project.id == project_id)
-        .first()
-    )
+    repository = Repository(db)
+    project = repository.get_project_by_id(project_id)
 
     if not project:
         logger.info(
@@ -382,14 +281,7 @@ def get_project_documents(
             detail="Project not found"
         )
 
-    membership = (
-        db.query(ProjectMember)
-        .filter(
-            ProjectMember.project_id == project_id,
-            ProjectMember.user_id == user_id,
-        )
-        .first()
-    )
+    membership = repository.get_project_member(project_id, user_id)
 
     if not membership and project.owner_id != user_id:
         logger.info(
@@ -402,11 +294,7 @@ def get_project_documents(
             detail="Only project members can list project documents"
         )
 
-    documents = (
-        db.query(Document)
-        .filter(Document.project_id == project_id)
-        .all()
-    )
+    documents = repository.get_project_documents(project_id)
 
     logger.info(
         "Project documents are returned successfully - " +
@@ -425,11 +313,8 @@ def upload_project_document(
     """Save an uploaded file and create its project document record."""
     os.makedirs("uploads", exist_ok=True)
 
-    project = (
-        db.query(Project)
-        .filter(Project.id == project_id)
-        .first()
-    )
+    repository = Repository(db)
+    project = repository.get_project_by_id(project_id)
 
     if not project:
         logger.info(
@@ -441,14 +326,7 @@ def upload_project_document(
             detail="Project not found"
         )
 
-    membership = (
-        db.query(ProjectMember)
-        .filter(
-            ProjectMember.project_id == project_id,
-            ProjectMember.user_id == user_id,
-        )
-        .first()
-    )
+    membership = repository.get_project_member(project_id, user_id)
 
     if not membership and project.owner_id != user_id:
         logger.info(
@@ -461,23 +339,7 @@ def upload_project_document(
             detail="Only project members can upload documents"
         )
 
-    unique_name = f"{uuid.uuid4()}_{file.filename}"
-    file_path = os.path.join("uploads", unique_name)
-
-    with open(file_path, "wb") as buffer:
-        buffer.write(file.file.read())
-
-    document = Document(
-        filename=file.filename,
-        stored_filename=unique_name,
-        file_path=file_path,
-        project_id=project_id,
-        uploaded_by=user_id,
-    )
-
-    db.add(document)
-    db.commit()
-    db.refresh(document)
+    document = repository.create_document(file, project_id, user_id)
 
     logger.info(
         "Document is uploaded successfully - " +

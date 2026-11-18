@@ -1,6 +1,7 @@
 """Shared pytest fixtures for API tests."""
 
 from contextlib import asynccontextmanager
+import os
 
 import pytest
 
@@ -8,6 +9,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+
+# Keep tests independent of developer and production database credentials.
+os.environ.setdefault("DATABASE_URL", "sqlite://")
+os.environ.setdefault("SECRET_KEY", "test-only-secret-key")
 
 from app.main import app
 from app.db.database import Base
