@@ -131,27 +131,28 @@ frontend/
 ├── src/
 │   ├── pages/
 │   ├── components/
-│   ├── modals/
+│   ├── hooks/
 │   └── api/
 │
 └── public/
 
+app/
+|
+├── routers/
+├── services/
+├── schemas/
+├── repositories/
+├── models/
+├── internal/
+├── enums/
+├── db/
+├── core/
 
-backend/
-│
-├── app/
-│   ├── routers/
-│   ├── services/
-│   ├── repositories/
-│   ├── models/
-│   ├── schemas/
-│   └── db/
-│
-├── tests/
-│
-├── Dockerfile
-├── docker-compose.yml
-└── requirements.txt
+tests/
+
+Dockerfile
+docker-compose.yml
+requirements.txt
 ```
 
 ---
