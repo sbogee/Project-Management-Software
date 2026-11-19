@@ -127,13 +127,26 @@ src/
 │   └── ProjectDetailsPage
 │
 ├── components/
-│
-└── modals/
-    ├── CreateProjectModal
-    ├── EditProjectModal
-    ├── InviteMemberModal
-    ├── UploadDocumentModal
-    └── DeleteProjectModal
+│   ├── modals/
+|   │   ├── CreateProjectModal
+|   │   ├── EditProjectModal
+|   │   ├── InviteMemberModal
+|   │   ├── UploadDocumentModal
+|   │   └── DeleteProjectModal
+|   │   ├── DeleteDocumentModal
+|   │   └── EditDocumentModal
+|   │
+│   └── projects/
+|       ├── ProjectDocumentsSection
+|       ├── ProjectMembersSection
+|       ├── ProjectOverviewSection
+|       ├── ProjectsHeader
+|       └── ProjectsList
+|
+└── hooks/
+    ├── useProjectDetails
+    └── useProjects
+
 ```
 
 ---
